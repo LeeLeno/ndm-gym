@@ -131,10 +131,13 @@ def main():
     # normalizers from all training transitions, as online collection fits them
     for t in range(buf.size):
         S0, S1 = unflatten_state(buf.data["s"][t]), unflatten_state(buf.data["s1"][t])
-        algo.wm.in_norm.update(algo.wm.inputs(S0, buf.data["a"][t], normalize_xi(buf.data["xi"][t])))
-        algo.wm.out_norm.update(algo.wm.targets(S0, S1))
+        algo.update_wm_norms(S0, S1, buf.data["a"][t], buf.data["xi"][t])
     if args.init_wm:
-        algo.wm.load_state_dict(torch.load(args.init_wm, map_location=dev)["wm"])
+        init = torch.load(args.init_wm, map_location=dev, weights_only=True)
+        init_structured = bool(init.get("args", {}).get("wm_structured", False))
+        if init_structured != args.wm_structured:
+            raise ValueError(f"--init_wm wm_structured={init_structured} does not match requested {args.wm_structured}")
+        algo.wm.load_state_dict(init["wm"])
     failed = lambda s1, f: mdp.termination(unflatten_state(s1), f + 1)  # noqa: E731  (as TrackingSim.step)
     tests = {}
     for spec in args.test:

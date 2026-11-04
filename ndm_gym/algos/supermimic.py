@@ -53,7 +53,8 @@ class SuperMimic(Algo):
 
     @staticmethod
     def world_model_cls(a):
-        return IncrementWorldModel(hidden=a["wm_hidden"], act=a["wm_act"], layer_norm=not a["wm_no_ln"], rigidformer=rigidformer_kwargs(a))
+        return IncrementWorldModel(hidden=a["wm_hidden"], act=a["wm_act"], layer_norm=not a["wm_no_ln"], rigidformer=rigidformer_kwargs(a),
+                                   structured=a.get("wm_structured", False))
 
     @classmethod
     def is_residual(cls, a):
@@ -75,7 +76,9 @@ class SuperMimic(Algo):
 
     # ------------------------------------------------------------------ world model (Eq. 1, state term)
     def _wm_err(self, S_hat, s1, mask):
-        std = torch.maximum(self.wm.out_norm.std(), self.err_floor)
+        # With --wm_structured, out_norm normalizes position residuals and velocity increments;
+        # the loss must stay normalized by plain physical increments.
+        std = torch.maximum(self.wm.inc_norm.std(), self.err_floor)
         e = (self.wm.state_error(S_hat, unflatten_state(s1)) / std) ** 2  # (B, k, D)
         e = e.mean(-1)
         return (e * mask).sum() / s1.shape[0], e[:, -1], (e * mask).sum(1)

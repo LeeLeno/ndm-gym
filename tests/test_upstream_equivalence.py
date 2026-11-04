@@ -89,7 +89,9 @@ def test_networks(upstream, motion):
     wm1, pi1, v1 = IncrementWorldModel(hidden=(64, 64)), TrackingPolicy(OBS_DIM, 730, hist=10), Critic(300)
     for m0, m1 in ((wm0, wm1), (pi0, pi1), (v0, v1)):
         s0, s1 = m0.state_dict(), m1.state_dict()
-        assert list(s0) == list(s1)
+        assert set(s0).issubset(s1)
+        if m0 is wm0:
+            assert set(s1) - set(s0) == {f"inc_norm.{k}" for k in ("mean", "var", "count")}
         for k in s0:
             torch.testing.assert_close(s1[k], s0[k], **EXACT)
     f, S, xi = random_states(motion, 64, seed=5)

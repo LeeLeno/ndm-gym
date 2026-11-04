@@ -276,7 +276,9 @@ class Algo:
         """Fit the world model's input and output normalizers on simulator transitions (states S0 -> S1, setpoints a,
         context xi)."""
         self._update_norm(self.wm.in_norm, self.norm_inputs(S0, a, normalize_xi(xi)))
-        self._update_norm(self.wm.out_norm, self.wm.targets(S0, S1))
+        self._update_norm(self.wm.out_norm, getattr(self.wm, "regression_targets", self.wm.targets)(S0, S1))
+        if hasattr(self.wm, "inc_norm"):
+            self._update_norm(self.wm.inc_norm, self.wm.targets(S0, S1))
 
     @torch.no_grad()
     def update_pi_norms(self, o, g):

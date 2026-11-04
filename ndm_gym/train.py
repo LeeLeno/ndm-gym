@@ -68,6 +68,8 @@ def add_train_args(parser: argparse.ArgumentParser):
     parser.add_argument("--wm_hidden", type=int, nargs="+", default=[2048, 2048, 2048], help="world-model MLP widths")
     parser.add_argument("--wm_act", type=str, default="silu", choices=["silu", "gelu", "elu", "mish", "relu"])
     parser.add_argument("--wm_no_ln", action="store_true", help="world model without LayerNorm")
+    parser.add_argument("--wm_structured", action="store_true",
+                        help="supermimic: velocity increments plus semi-implicit trapezoidal position drift and residuals")
     parser.add_argument("--wm_input_noise", type=float, default=0.0, help="std of noise on normalized world-model inputs while fitting")
     parser.add_argument("--wm_smooth_w", type=float, default=0.0,
                         help="both: weight of a finite-difference Jacobian penalty on the world model's network while fitting (0: off)")  # fmt: skip
@@ -274,6 +276,7 @@ def main():
     if args.resume:
         ck = torch.load(args.resume, map_location=dev)
         assert ck["args"]["algo"] == args.algo, (ck["args"]["algo"], args.algo)
+        assert ck["args"].get("wm_structured", False) == args.wm_structured, "--wm_structured must match the checkpoint's run"
         # the optimizers' settings are loaded with their state: another Adam implementation would be replaced by the saved one
         assert ck["args"].get("fused_adam", False) == args.fused_adam, "--fused_adam must match the checkpoint's run"
         assert ck["args"].get("critic_cudagraphs", False) == args.critic_cudagraphs, "--critic_cudagraphs must match the checkpoint's run"

@@ -161,6 +161,8 @@ class SuperTrack(Algo):
 
     @staticmethod
     def world_model_cls(a):
+        if a.get("wm_structured", False):
+            raise ValueError("--wm_structured applies to --algo supermimic; SuperTrack already uses semi-implicit acceleration integration")
         return AccelWorldModel(hidden=a["wm_hidden"], substeps=a["st_substeps"], act=a["wm_act"], layer_norm=not a["wm_no_ln"],
                                rigidformer=rigidformer_kwargs(a))
 

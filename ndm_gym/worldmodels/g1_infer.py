@@ -31,7 +31,7 @@ import torch.nn as nn
 from ..core.nets import run_mlp
 from ..core.rotations import so3_exp
 from ..robots.g1 import NUM_J
-from ..state import XI_DIM
+from ..state import CONTROL_DT, XI_DIM
 from .accel import AccelWorldModel
 from .increment import IncrementWorldModel
 from .rigidformer import GLOBAL_DIM, RigidFormerNet
@@ -181,6 +181,8 @@ def inference_copy(wm: nn.Module, dtype: torch.dtype | None = torch.bfloat16, at
     device first (``check_copy``)."""
     if not isinstance(wm, (AccelWorldModel, IncrementWorldModel)):
         raise TypeError(f"expected an AccelWorldModel or IncrementWorldModel, got {type(wm).__name__}")
+    if fused and getattr(wm, "structured", False):
+        raise ValueError("the fused integrator currently implements unstructured increments; structured fitting must use fused=False")
     rf = isinstance(wm.net, RigidFormerNet)
     if type(wm.net) not in (RigidFormerNet, nn.Sequential):
         raise TypeError(f"the world model's network must be as trained (a RigidFormerNet or the MLP), got {type(wm.net).__name__}")
@@ -251,7 +253,9 @@ def check_copy(wm: nn.Module, m: G1InferenceModel, n: int = 64):
                                    f"{torch.cuda.get_device_name()}")  # fmt: skip
             y = 0.5 * torch.randn(n, wm.out_norm.mean.numel(), device=dev, generator=torch.Generator(device=dev).manual_seed(1))
             proxy = types.SimpleNamespace(in_norm=lambda x: x, inputs=lambda *s: torch.zeros(n, 1, device=dev), net=lambda x: y, amp=False,
-                                          out_norm=wm.out_norm, pos_coef=getattr(wm, "pos_coef", None))  # fmt: skip
+                                          out_norm=wm.out_norm, pos_coef=getattr(wm, "pos_coef", None), structured=getattr(wm, "structured", False),
+                                          dt=getattr(wm, "dt", CONTROL_DT))  # fmt: skip
+            proxy.integrate = lambda S, d: type(wm).integrate(proxy, S, d)
             ref_next = _fp32(lambda: type(wm).step(proxy, S, a, xi_n))
             got_next = _fp32(lambda: m.integrate(y, S))
             for r_, g_ in zip(ref_next, got_next):
